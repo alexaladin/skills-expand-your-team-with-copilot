@@ -472,6 +472,58 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Function to copy text to clipboard and show a confirmation message
+  function copyToClipboard(text, activityName) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showMessage(`Link for "${activityName}" copied to clipboard!`, "success");
+      }).catch(() => {
+        fallbackCopyToClipboard(text, activityName);
+      });
+    } else {
+      fallbackCopyToClipboard(text, activityName);
+    }
+  }
+
+  // Fallback copy for browsers without Clipboard API
+  function fallbackCopyToClipboard(text, activityName) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      document.execCommand("copy");
+      showMessage(`Link for "${activityName}" copied to clipboard!`, "success");
+    } catch (err) {
+      showMessage("Could not copy link. Please copy the URL manually.", "error");
+    }
+    document.body.removeChild(textarea);
+  }
+
+  // Function to share an activity using the Web Share API or clipboard fallback
+  function shareActivity(name, details) {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?activity=${encodeURIComponent(name)}`;
+    const shareTitle = `${name} – Mergington High School`;
+    const shortDescription = details.description.length > 100
+      ? details.description.slice(0, 97) + "..."
+      : details.description;
+    const shareText = `Check out "${name}" at Mergington High School! ${shortDescription} Schedule: ${formatSchedule(details)}`;
+
+    if (navigator.share) {
+      navigator.share({ title: shareTitle, text: shareText, url: shareUrl })
+        .catch((err) => {
+          if (err.name !== "AbortError") {
+            copyToClipboard(shareUrl, name);
+          }
+        });
+    } else {
+      copyToClipboard(shareUrl, name);
+    }
+  }
+
   // Function to render a single activity card
   function renderActivityCard(name, details) {
     const activityCard = document.createElement("div");
@@ -568,6 +620,9 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         `
         }
+        <button class="share-button" data-activity="${name}" title="Share this activity">
+          🔗 Share
+        </button>
       </div>
     `;
 
@@ -585,6 +640,14 @@ document.addEventListener("DOMContentLoaded", () => {
           openRegistrationModal(name);
         });
       }
+    }
+
+    // Add click handler for the share button
+    const shareButton = activityCard.querySelector(".share-button");
+    if (shareButton) {
+      shareButton.addEventListener("click", () => {
+        shareActivity(name, details);
+      });
     }
 
     activitiesList.appendChild(activityCard);
